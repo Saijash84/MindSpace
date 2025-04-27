@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 from datetime import datetime, timedelta
+from services.storage_service import StorageService
 
 class FocusMode:
     def __init__(self):
@@ -53,44 +54,123 @@ class FocusMode:
         else:
             st.success("Break's over! Time to get back to work.")
 
-def render_focus_mode():
-    st.subheader("🎯 Focus Mode")
-    
-    focus_mode = FocusMode()
-    
-    # Session settings
-    col1, col2 = st.columns(2)
-    with col1:
-        work_time = st.number_input("Work Duration (minutes)", 1, 60, 25)
-        focus_mode.work_duration = work_time * 60
-    with col2:
-        break_time = st.number_input("Break Duration (minutes)", 1, 30, 5)
-        focus_mode.break_duration = break_time * 60
-    
-    # Session counter
-    if 'session_count' not in st.session_state:
-        st.session_state.session_count = 0
-    
-    # Timer controls
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Start Work Session"):
-            st.session_state.session_count += 1
-            focus_mode.run_timer(focus_mode.work_duration, "work")
+def render_focus_mode(storage_service: StorageService):
+    """Main function to render the focus mode interface"""
+    st.title("🎯 Focus Mode")
+
+    # Initialize session state for focus sessions
+    if 'focus_active' not in st.session_state:
+        st.session_state.focus_active = False
+    if 'focus_start_time' not in st.session_state:
+        st.session_state.focus_start_time = None
+
+    # Focus session setup
+    if not st.session_state.focus_active:
+        with st.form("focus_setup"):
+            task_description = st.text_input("What are you focusing on?")
+            duration = st.slider("Session Duration (minutes)", 5, 120, 25)
+            start_button = st.form_submit_button("Start Focus Session")
+
+            if start_button and task_description:
+                st.session_state.focus_active = True
+                st.session_state.focus_start_time = datetime.now()
+                st.session_state.focus_duration = duration
+                st.session_state.focus_task = task_description
+                
+                # Save focus session start
+                user_id = st.session_state.get('user_id')
+                if user_id:
+                    focus_data = {
+                        "task": task_description,
+                        "duration": duration,
+                        "start_time": datetime.now().isoformat(),
+                        "status": "active"
+                    }
+                    storage_service.save_focus_entry(user_id, focus_data)
+                st.rerun()
+
+    # Active focus session
+    if st.session_state.focus_active:
+        elapsed_time = datetime.now() - st.session_state.focus_start_time
+        remaining_time = timedelta(minutes=st.session_state.focus_duration) - elapsed_time
+
+        if remaining_time.total_seconds() <= 0:
+            st.success("Focus session completed! 🎉")
             
-            # Check if it's time for a long break
-            if st.session_state.session_count % focus_mode.sessions_before_long_break == 0:
-                st.info("You've completed several sessions! Time for a longer break.")
-                if st.button("Start Long Break"):
-                    focus_mode.run_timer(focus_mode.long_break_duration, "break")
+            # Save completed session
+            user_id = st.session_state.get('user_id')
+            if user_id:
+                focus_data = {
+                    "task": st.session_state.focus_task,
+                    "duration": st.session_state.focus_duration,
+                    "start_time": st.session_state.focus_start_time.isoformat(),
+                    "end_time": datetime.now().isoformat(),
+                    "status": "completed"
+                }
+                storage_service.save_focus_entry(user_id, focus_data)
+
+            # Reset session state
+            st.session_state.focus_active = False
+            st.session_state.focus_start_time = None
+            if st.button("Start New Session"):
+                st.rerun()
+        else:
+            # Display timer
+            mins, secs = divmod(remaining_time.seconds, 60)
+            st.header(f"⏱️ {mins:02d}:{secs:02d}")
+            st.write(f"Focusing on: {st.session_state.focus_task}")
+
+            if st.button("End Session Early"):
+                # Save interrupted session
+                user_id = st.session_state.get('user_id')
+                if user_id:
+                    focus_data = {
+                        "task": st.session_state.focus_task,
+                        "duration": st.session_state.focus_duration,
+                        "start_time": st.session_state.focus_start_time.isoformat(),
+                        "end_time": datetime.now().isoformat(),
+                        "status": "interrupted"
+                    }
+                    storage_service.save_focus_entry(user_id, focus_data)
+
+                st.session_state.focus_active = False
+                st.session_state.focus_start_time = None
+                st.rerun()
+
+    # Display focus history
+    st.subheader("Focus History")
+    user_id = st.session_state.get('user_id')
+    if user_id:
+        try:
+            user_data = storage_service.get_user_history(user_id)
+            focus_sessions = user_data.get('focus_history', [])
+            
+            if not focus_sessions:
+                st.info("No focus sessions recorded yet. Start your first session!")
             else:
-                if st.button("Start Break"):
-                    focus_mode.run_timer(focus_mode.break_duration, "break")
-    
-    # Session statistics
-    st.markdown("---")
-    st.write(f"Completed Sessions: {st.session_state.session_count}")
-    
+                # Filter options
+                status_filter = st.selectbox("Filter by Status", 
+                    ["All", "Completed", "Interrupted"])
+                
+                # Apply filters
+                filtered_sessions = focus_sessions
+                if status_filter != "All":
+                    filtered_sessions = [s for s in filtered_sessions 
+                                      if s['status'].lower() == status_filter.lower()]
+                
+                # Display sessions
+                for session in filtered_sessions:
+                    with st.expander(
+                        f"{session['task']} ({session['duration']} mins) - {session['status']}"):
+                        st.write(f"Started: {session['start_time']}")
+                        if 'end_time' in session:
+                            st.write(f"Ended: {session['end_time']}")
+                        st.write(f"Status: {session['status']}")
+                        
+        except Exception as e:
+            st.error(f"Error loading focus history: {str(e)}")
+            st.info("Using local storage as fallback")
+
     # Tips for focus
     st.markdown("""
     ### Tips for Better Focus:

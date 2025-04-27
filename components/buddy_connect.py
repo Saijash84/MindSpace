@@ -99,106 +99,45 @@ class BuddyConnect:
             st.error(f"Error retrieving messages: {e}")
             return []
 
-def render_buddy_connect():
-    st.subheader("🤝 Buddy Connect")
-    
-    buddy_connect = BuddyConnect()
-    
-    if 'user_id' not in st.session_state:
-        st.warning("Please log in to use Buddy Connect")
-        return
-    
-    # Profile Management
-    with st.expander("My Profile"):
-        profile = buddy_connect.get_profile(st.session_state.user_id)
-        
-        if not profile:
-            with st.form("create_profile"):
-                name = st.text_input("Name")
-                interests = st.multiselect(
-                    "Interests",
-                    ["Study Groups", "Mental Health", "Career Development", "Hobbies", "Sports"]
-                )
-                bio = st.text_area("Bio")
-                
-                if st.form_submit_button("Create Profile"):
-                    if name and interests and bio:
-                        if buddy_connect.create_profile(
-                            st.session_state.user_id,
-                            name,
-                            interests,
-                            bio
-                        ):
-                            st.success("Profile created successfully!")
-                            st.rerun()
-                    else:
-                        st.warning("Please fill in all fields.")
-        else:
-            st.write(f"**Name:** {profile['name']}")
-            st.write(f"**Interests:** {', '.join(profile['interests'])}")
-            st.write(f"**Bio:** {profile['bio']}")
-            
-            if st.button("Edit Profile"):
-                with st.form("edit_profile"):
-                    new_name = st.text_input("Name", value=profile['name'])
-                    new_interests = st.multiselect(
-                        "Interests",
-                        ["Study Groups", "Mental Health", "Career Development", "Hobbies", "Sports"],
-                        default=profile['interests']
-                    )
-                    new_bio = st.text_area("Bio", value=profile['bio'])
-                    
-                    if st.form_submit_button("Update Profile"):
-                        if buddy_connect.update_profile(
-                            st.session_state.user_id,
-                            new_name,
-                            new_interests,
-                            new_bio
-                        ):
-                            st.success("Profile updated successfully!")
-                            st.rerun()
-    
-    # Browse Profiles
-    st.markdown("---")
-    st.subheader("Browse Profiles")
-    
-    profiles = buddy_connect.get_all_profiles()
-    profiles = [p for p in profiles if p['user_id'] != st.session_state.user_id]
-    
-    if profiles:
-        for profile in profiles:
-            with st.expander(f"{profile['name']} - {', '.join(profile['interests'])}"):
-                st.write(profile['bio'])
-                
-                # Message Section
-                st.markdown("---")
-                st.write("💬 Send Message")
-                
-                with st.form(f"message_form_{profile['user_id']}"):
-                    message = st.text_area("Your message")
-                    if st.form_submit_button("Send"):
-                        if message:
-                            if buddy_connect.send_message(
-                                st.session_state.user_id,
-                                profile['user_id'],
-                                message
-                            ):
-                                st.success("Message sent!")
-                                st.rerun()
-                        else:
-                            st.warning("Please enter a message.")
-                
-                # View Messages
-                messages = buddy_connect.get_messages(st.session_state.user_id, profile['user_id'])
-                if messages:
-                    st.markdown("---")
-                    st.write("📨 Messages")
-                    for msg in messages:
-                        st.markdown(f"""
-                        <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin: 5px 0;'>
-                            <p>{msg['content']}</p>
-                            <small>{'You' if msg['sender_id'] == st.session_state.user_id else profile['name']} | {msg['timestamp']}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
+def render_buddy_connect(storage_service, user_id):
+    st.header("🤝 Buddy Connect")
+
+    # Edit profile
+    profile = storage_service.get_user_profile(user_id)
+    with st.form("edit_profile"):
+        bio = st.text_area("Your Bio", value=profile.get("bio", ""))
+        interests = st.text_input("Your Interests (comma separated)", value=", ".join(profile.get("interests", [])))
+        submitted = st.form_submit_button("Update Profile")
+        if submitted:
+            interests_list = [i.strip() for i in interests.split(",") if i.strip()]
+            storage_service.update_user_profile(user_id, bio, interests_list)
+            st.success("Profile updated!")
+
+    # Find buddies
+    st.subheader("Find Buddies")
+    if profile.get("interests"):
+        buddies = storage_service.find_buddies_by_interest(user_id, profile["interests"])
+        for buddy in buddies:
+            st.write(f"**{buddy['name']}** - {buddy['bio']}")
+            st.write(f"Interests: {', '.join(buddy['interests'])}")
+            if st.button(f"Chat with {buddy['name']}", key=buddy['user_id']):
+                chat_id = storage_service.get_or_create_chat(user_id, buddy['user_id'])
+                render_buddy_chat(storage_service, chat_id, user_id)
     else:
-        st.info("No other profiles found yet. Check back later!") 
+        st.info("Add interests to find buddies.")
+
+def render_buddy_chat(storage_service, chat_id, user_id):
+    st.subheader("Chat")
+    messages = storage_service.get_buddy_messages(chat_id)
+    for msg in messages:
+        st.write(f"{msg['sender']}: {msg['content']} ({msg['type']})")
+    # Text message
+    text = st.text_input("Type a message")
+    if st.button("Send Text"):
+        storage_service.send_buddy_message(chat_id, user_id, "text", text)
+        st.rerun()
+    # Audio/file upload (for brevity, just show upload)
+    uploaded_file = st.file_uploader("Send a file or audio", type=["mp3", "wav", "png", "jpg", "pdf"])
+    if uploaded_file:
+        # You would need to upload this to a storage bucket and save the URL in Firestore
+        st.info("File upload handling not implemented in this snippet.") 

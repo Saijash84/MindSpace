@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, firestore
+import streamlit as st
 
 # Load environment variables
 load_dotenv()
@@ -16,19 +17,31 @@ FIREBASE_CONFIG = {
     "appId": os.getenv("FIREBASE_APP_ID"),
 }
 
-def get_db():
-    """Get Firestore database instance"""
-    if not firebase_admin._apps:
-        try:
-            cred = credentials.Certificate("firebase-key.json")
+def initialize_firebase():
+    """Initialize Firebase with error handling"""
+    try:
+        if not firebase_admin._apps:
+            cred = credentials.Certificate("firebase-credentials.json")
             firebase_admin.initialize_app(cred)
-        except Exception as e:
-            print(f"Firebase initialization error: {e}")
-            return None
-    return firestore.client()
+        return firestore.client()
+    except Exception as e:
+        st.warning(f"Firebase initialization error: {str(e)}")
+        return None
 
-# Initialize db
-db = get_db()
+# Initialize Firestore with error handling
+db = initialize_firebase()
+
+# Function to check if Firestore is working
+def is_firestore_available():
+    """Check if Firestore is available and working"""
+    if not db:
+        return False
+    try:
+        # Try a simple operation
+        db.collection('test').limit(1).get()
+        return True
+    except Exception:
+        return False
 
 # OpenRouter/LLM Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")

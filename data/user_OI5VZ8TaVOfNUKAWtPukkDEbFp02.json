@@ -1,0 +1,55 @@
+{
+  "created_at": "2025-04-26T22:38:46.837909",
+  "mood_history": [
+    {
+      "user_message": "bye",
+      "style": "Supportive",
+      "ai_response": "It was great chatting with you! \ud83d\ude0a Remember, you're doing amazing and your happiness is something to be celebrated! \ud83d\udc9b If you ever need to talk or track your mood, I'm here for you. Take care and stay wonderful! \ud83d\udc4b",
+      "timestamp": "2025-04-26 22:39:34.880460+00:00",
+      "mood": "Happy"
+    },
+    {
+      "user_message": "whats the matter",
+      "style": "Supportive",
+      "ai_response": "I think there might be some confusion! You initially mentioned your current mood as \"Happy\" \ud83c\udf1e. But now you're asking \"what's the matter\"? That makes me wonder, is everything okay? Did something change that's making you feel concerned or uncertain? \ud83e\udd14",
+      "timestamp": "2025-04-26 22:41:55.828673+00:00",
+      "mood": "Happy"
+    }
+  ],
+  "chat_history": [],
+  "task_history": [
+    {
+      "description": "",
+      "id": "1745687540.028433",
+      "title": "Project",
+      "due_date": "2025-04-26",
+      "status": "pending",
+      "timestamp": "2025-04-26T22:42:20.028433",
+      "priority": "High"
+    },
+    {
+      "description": "study",
+      "id": "1745687548.989731",
+      "title": "exam",
+      "due_date": "2025-04-26",
+      "status": "pending",
+      "timestamp": "2025-04-26T22:42:28.989731",
+      "priority": "High"
+    }
+  ],
+  "focus_history": [
+    {
+      "duration": 15,
+      "start_time": "2025-04-26T22:43:34.591544",
+      "status": "active",
+      "task": "study"
+    }
+  ],
+  "last_login": "2025-04-26T22:50:41.649903",
+  "settings": {
+    "notifications_enabled": true,
+    "theme": "light"
+  },
+  "email": "saijashwanth173@gmail.com",
+  "name": "saijashwanth173"
+}
